@@ -17,3 +17,6 @@ def relativeCoordinatesToSquareIndex(coords):
 def mousePositionToSquareIndex(position, tileSize):
     coords = mousePositionToRelativeCoordinate(position, tileSize)
     return relativeCoordinatesToSquareIndex(coords)
+
+def fileRankInbounds(file, rank):
+    return (0 <= file < 8 and 0 <= rank < 8)

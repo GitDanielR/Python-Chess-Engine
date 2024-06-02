@@ -3,6 +3,9 @@ import pygame
 color = {
     'lightTile'     : (238,238,210),
     'darkTile'      : (118,150,86),
+    'selected'      : (255, 255, 51),
+    'legalMove'     : (108, 108, 108),
+    'capture'       : (225, 95, 75)
 }
 
 piecesImg = pygame.image.load('chessPieces/pieces.png')
