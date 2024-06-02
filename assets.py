@@ -5,7 +5,9 @@ color = {
     'darkTile'      : (118,150,86),
     'selected'      : (255, 255, 51),
     'legalMove'     : (108, 108, 108),
-    'capture'       : (225, 95, 75)
+    'capture'       : (225, 95, 75),
+    'black'         : (0, 0, 0),
+    'white'         : (255, 255, 255)
 }
 
 piecesImg = pygame.image.load('chessPieces/pieces.png')

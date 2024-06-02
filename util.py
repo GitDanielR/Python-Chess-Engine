@@ -1,3 +1,5 @@
+import piece
+
 def squareIndexToRelativeCoordinate(index):
     rank = int(index / 8)
     file = index % 8
