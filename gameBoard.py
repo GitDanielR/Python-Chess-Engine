@@ -303,7 +303,7 @@ class board:
 
     def updateBoardWithMove(self, chosenMove):
         if (chosenMove.capturedPiece != piece.none):
-            self.setPieceInformationAtIndex(piece.none, chosenMove.endSquare)
+            self.setPieceInformationAtIndex(piece.none, chosenMove.capturedPieceSquare)
 
         currentPiece = self.board[chosenMove.startSquare]
         self.setPieceInformationAtIndex(currentPiece, chosenMove.endSquare)
