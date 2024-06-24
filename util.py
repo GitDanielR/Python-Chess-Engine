@@ -22,3 +22,12 @@ def mousePositionToSquareIndex(position, tileSize):
 
 def fileRankInbounds(file, rank):
     return (0 <= file < 8 and 0 <= rank < 8)
+
+def dFdRtoType(df, dr):
+    horizontalSliding = abs(df)
+    verticalSliding = abs(dr)
+    if horizontalSliding and verticalSliding:
+        return 'diagonal'
+    elif horizontalSliding:
+        return 'horizontal'
+    return 'vertical'

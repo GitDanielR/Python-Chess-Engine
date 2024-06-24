@@ -36,8 +36,8 @@ class game:
                 if (squareIndex == self.events.squareSelected):
                     tileColor = assets.color['selected']
                 pygame.draw.rect(self.window, tileColor, (file*self.tileSize, rank*self.tileSize, self.tileSize, self.tileSize))
-                if (self.board.legalMoves is not None):
-                    if (squareIndex in [possibleMove.endSquare for possibleMove in self.board.legalMoves]):
+                if (self.board.legalMoves is not None and self.events.squareSelected in self.board.legalMoves):
+                    if (squareIndex in [possibleMove.endSquare for possibleMove in self.board.legalMoves[self.events.squareSelected]]):
                         if (self.board.isOpponent(squareIndex, self.events.squareSelected) or self.board.isPawnCapture(self.events.squareSelected, squareIndex)):
                             pygame.draw.rect(self.window, assets.color['capture'], (file*self.tileSize, rank*self.tileSize, self.tileSize, self.tileSize))
                         else:
@@ -59,32 +59,21 @@ class game:
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_z:
                     self.board.unmakeMove()
-                elif event.key == pygame.K_r:
+                elif event.key == pygame.K_r:   # reset
                     self.board = gameBoard.board()
                     self.events = events.events()
 
     def updateMouseEvent(self):
-        if (self.events.addClick(pygame.mouse.get_pos(), self.tileSize)):
-            print(self.events.squareSelected)
-            if (len(self.events.mouseClicks) == 2):
-                endMouseSquare = self.events.mouseClicks[1]
-                chosenMove = next((possibleMove for possibleMove in self.board.legalMoves if possibleMove.endSquare == endMouseSquare), None)
-                if chosenMove is None: return
-                
-                self.board.makeMove(chosenMove)
-                self.clearUserInput()
-            elif (not self.board.verifySelection(self.events.squareSelected)):
-                self.clearUserInput()
-            else:
-                self.board.populatelegalMoves(self.events.squareSelected)
-                if (self.board.legalMoves is not None):
-                    return
+        if (self.events.addClick(pygame.mouse.get_pos(), self.tileSize)):   # there was a click that wasn't deselecting (either first or second)
+            if (len(self.events.mouseClicks) == 2): # trying to make move
+                startSquare = self.events.mouseClicks[0]
+                endSquare = self.events.mouseClicks[1]
+                chosenMove = next((possibleMove for possibleMove in self.board.legalMoves[startSquare] if possibleMove.endSquare == endSquare), None)
+                if chosenMove is not None: self.board.makeMove(chosenMove)  # valid move chosen, make it
+            elif (self.board.verifySelection(self.events.squareSelected)):  # first click, make sure can choose that square
+                return
         
-        self.clearUserInput()
-
-    def clearUserInput(self):
-        self.events.resetMouseInput()
-        self.board.legalMoves = []
+        self.events.resetMouseInput()   # clear user inputs (after move made or invalid piece chosen)
 
 class loadedAssets:
     def __init__(self, tileSize):
