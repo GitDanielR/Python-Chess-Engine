@@ -45,7 +45,6 @@ class game:
             
         for index, pieceType in enumerate(self.board.pieceLists):
             for activePiecePosition in pieceType:
-                # pieceImage = pygame.transform.scale(assets.pieceNumberToImage[index], (self.tileSize, self.tileSize))
                 self.window.blit(self.loadedAssets.images[index], tuple(x * self.tileSize for x in util.squareIndexToRelativeCoordinate(activePiecePosition)))
 
         pygame.display.flip()

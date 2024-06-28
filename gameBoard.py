@@ -310,7 +310,7 @@ class board:
 
         currentPiece = self.board[chosenMove.startSquare]
         currentPieceType = board.pieceToPieceType(currentPiece)
-        if currentPieceType == piece.pawn:  # pawn promotion (automatic queen)
+        if currentPieceType == piece.pawn:  # pawn promotion
             file,rank = util.squareIndexToRelativeCoordinate(chosenMove.endSquare)
             if rank == 0 or rank == 7:  # update the pieceLists 
                 chosenPiece = promotionScreen.choosePromotionForPawn()
@@ -400,7 +400,7 @@ class CastlingRights:
             'blackKingSide': blackKingSide
         }
         self.savedStates = []
-        
+
     def saveCastleState(self):
         self.savedStates.append(self.possibleCastles.copy())
 
