@@ -2,6 +2,7 @@ from dataclasses import dataclass
 import numpy as np
 import piece
 import util
+import promotionScreen
 
 @dataclass
 class move:
@@ -9,19 +10,24 @@ class move:
     endSquare: int
     capturedPiece: piece
     capturedPieceSquare: int
+    isCastle: bool
 
 class board:
     startingFen = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
+    pawnPromotionFen = '8/P7/8/8/8/8/8/8 w - - 0 1'
+    allCastlingPossibleFen = 'r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1'
     
     def __init__(self):
         self.board = np.zeros(64, dtype=np.uint8)
         self.bitboards = np.zeros(6, dtype=np.uint64)
         self.pieceLists = [list() for _ in range(12)]
+        self.castlingRights = CastlingRights()
         self.whiteToMove = True
         self.check = False
         self.moveLog = []
         self.legalMoves = {}
         self.piecesLegalMoves = []
+        self.squaresEnemyAttacks = []
         self.initBoard()
 
     def initBoard(self):
@@ -76,7 +82,6 @@ class board:
                     pieceType = pieceTypeFromSymbol[char.lower()]
                     self.board[rank*8 + file] = pieceColor | pieceType
                     file += 1
-        print(self.board)
 
     def getAllLegalMoves(self):
         self.legalMoves = {}
@@ -110,8 +115,6 @@ class board:
             self.addDiagonalSliding(squareIndex)
         if pieceType == piece.queen or pieceType == piece.rook:
             self.addSliding(squareIndex)
-
-        self.filterMoves()
 
     def generatePawnMoves(self, squareIndex):
         movementDirection = -8 if piece.isWhite(self.board[squareIndex]) else 8
@@ -151,39 +154,16 @@ class board:
     def generateKnightMoves(self, squareIndex):
         file,rank = util.squareIndexToRelativeCoordinate(squareIndex)
 
-        if (file > 1):
-            if (rank < 7):
-                newSquareIndex = util.relativeCoordinatesToSquareIndex((file-2, rank+1))
-                self.addMoveData(squareIndex, newSquareIndex, self.board[newSquareIndex], newSquareIndex)
-            if (rank > 0):
-                newSquareIndex = util.relativeCoordinatesToSquareIndex((file-2, rank-1))
-                self.addMoveData(squareIndex, newSquareIndex, self.board[newSquareIndex], newSquareIndex)
-        if (file < 6):
-            if (rank < 7):
-                newSquareIndex = util.relativeCoordinatesToSquareIndex((file+2, rank+1))
-                self.addMoveData(squareIndex, newSquareIndex, self.board[newSquareIndex], newSquareIndex)
-            if (rank > 0):
-                newSquareIndex = util.relativeCoordinatesToSquareIndex((file+2, rank-1))
-                self.addMoveData(squareIndex, newSquareIndex, self.board[newSquareIndex], newSquareIndex)
-        if (rank > 1):
-            if (file < 7):
-                newSquareIndex = util.relativeCoordinatesToSquareIndex((file+1, rank-2))
-                self.addMoveData(squareIndex, newSquareIndex, self.board[newSquareIndex], newSquareIndex)
-            if (file > 0):
-                newSquareIndex = util.relativeCoordinatesToSquareIndex((file-1, rank-2))
-                self.addMoveData(squareIndex, newSquareIndex, self.board[newSquareIndex], newSquareIndex)
-        if (rank < 6):
-            if (file < 7):
-                newSquareIndex = util.relativeCoordinatesToSquareIndex((file+1, rank+2))
-                self.addMoveData(squareIndex, newSquareIndex, self.board[newSquareIndex], newSquareIndex)
-            if (file > 0):
-                newSquareIndex = util.relativeCoordinatesToSquareIndex((file-1, rank+2))
+        for knightMove in piece.knightMovementDirections:
+            newFile,newRank = file+knightMove[0],rank+knightMove[1]
+            if (util.fileRankInbounds(newFile,newRank)): 
+                newSquareIndex = util.relativeCoordinatesToSquareIndex((newFile,newRank))
                 self.addMoveData(squareIndex, newSquareIndex, self.board[newSquareIndex], newSquareIndex)
     
     def generateKingMoves(self, squareIndex):
         file,rank = util.squareIndexToRelativeCoordinate(squareIndex)
-        for df in range(-1,2):
-            for dr in range(-1,2):
+        for df in [-1,0,1]:
+            for dr in [-1,0,1]:
                 if (df == 0 and dr == 0):
                     continue
                 
@@ -192,17 +172,26 @@ class board:
                 if (not util.fileRankInbounds(newFile, newRank)):
                     continue
                 newSquareIndex = util.relativeCoordinatesToSquareIndex((newFile, newRank))
-                self.addMoveData(squareIndex, newSquareIndex, self.board[newSquareIndex], newSquareIndex)
+                # can't put yourself in check
+                if not newSquareIndex in self.squaresEnemyAttacks: self.addMoveData(squareIndex, newSquareIndex, self.board[newSquareIndex], newSquareIndex)
+
+        kingColor = 'white' if self.whiteToMove else 'black'
+        if self.castlingRights.possibleCastles[kingColor + 'QueenSide']: 
+            if ((squareIndex - 1) not in self.squaresEnemyAttacks) and ((squareIndex - 2) not in self.squaresEnemyAttacks):
+                self.addMoveData(squareIndex, squareIndex-2, piece.none, squareIndex-2, True)
+        if self.castlingRights.possibleCastles[kingColor + 'KingSide']: 
+            if ((squareIndex + 1) not in self.squaresEnemyAttacks) and ((squareIndex + 2) not in self.squaresEnemyAttacks):
+                self.addMoveData(squareIndex, squareIndex+2, piece.none, squareIndex+2, True)
     
     def addDiagonalSliding(self, squareIndex):
         file,rank = util.squareIndexToRelativeCoordinate(squareIndex)
-        for df in range(-1,2,2):
-            for dr in range(-1,2,2):
+        for df in [-1,1]:
+            for dr in [-1,1]:
                 currentFile,currentRank = file,rank
                 while (True):
                     currentFile += df
                     currentRank += dr
-                    if (not util.fileRankInbounds(currentFile, currentRank)): 
+                    if (not util.fileRankInbounds(currentFile, currentRank)):
                         break
                     currentSquare = util.relativeCoordinatesToSquareIndex((currentFile, currentRank))
                     pieceInPath = self.board[currentSquare]
@@ -212,7 +201,7 @@ class board:
     
     def addSliding(self, squareIndex):
         file,rank = util.squareIndexToRelativeCoordinate(squareIndex)
-        for movementDirection in range(-1,2,2):
+        for movementDirection in [-1,1]:
             currentFile = file
             while (True):
                 currentFile += movementDirection
@@ -224,7 +213,7 @@ class board:
                 if pieceInPath:
                     break
         
-        for movementDirection in range(-1,2,2):
+        for movementDirection in [-1,1]:
             currentRank = rank
             while (True):
                 currentRank += movementDirection
@@ -235,22 +224,19 @@ class board:
                 self.addMoveData(squareIndex, currentSquare, pieceInPath, currentSquare)
                 if pieceInPath:
                     break
-    
-    # TO-DO: Filter moves that leave king in check
-    def filterMoves(self):
-        for move in self.piecesLegalMoves:
-            pieceAtSquare = self.board[move.endSquare]
-            if (pieceAtSquare != piece.none):   # remove attacking own team
-                if (piece.isWhite(pieceAtSquare) == piece.isWhite(self.board[move.startSquare])):
-                    self.piecesLegalMoves.remove(move)
-
+        
     # pieceToMove/endPosition = (file,rank)
     def makeMove(self, chosenMove):
-        self.updateBoardWithMove(chosenMove)
+        self.castlingRights.saveCastleState()
         self.moveLog.append(chosenMove)
+
+        self.updateBoardWithMove(chosenMove)
         self.check = self.checkForCheck()
 
         if self.check: print('In check')
+        self.getAllLegalMoves()     # update what the person who just moved can do
+        # get all squares that the current (almost previous) team can attack - used for castling rights & pins
+        self.squaresEnemyAttacks = [item.endSquare for sublist in self.legalMoves.values() for item in sublist] 
         self.whiteToMove = not self.whiteToMove
         self.getAllLegalMoves()
 
@@ -261,15 +247,15 @@ class board:
 
         kingIsWhite = piece.isWhite(self.board[kingSquare])
         oppositeColor = piece.black if kingIsWhite else piece.white
-        movementDirection = -8 if kingIsWhite else 8
         
+        movementDirection = -8 if kingIsWhite else 8
         if self.board[kingSquare+movementDirection+1] == (piece.pawn | oppositeColor) or self.board[kingSquare+movementDirection-1] == (piece.pawn | oppositeColor): # pawns
             return True
+        
         for knightMovementDirection in piece.knightMovementDirections:  # knights
-            indexOffset = util.relativeCoordinatesToSquareIndex(knightMovementDirection)
-            squareToCheck = kingSquare+indexOffset
-            if not 0 <= squareToCheck < 64: continue
-            if self.board[squareToCheck] == (piece.knight | oppositeColor): 
+            knightFile,knightRank = file+knightMovementDirection[0],rank+knightMovementDirection[1]
+            if not util.fileRankInbounds(knightFile,knightRank): continue    # this should be in file,col -> can have weird knight checks?
+            if self.board[util.relativeCoordinatesToSquareIndex((knightFile,knightRank))] == (piece.knight | oppositeColor): 
                 return True
 
         closestPiecesSquare = []
@@ -307,20 +293,56 @@ class board:
     def unmakeMove(self):
         if (len(self.moveLog) == 0): return
         undoneMove = self.moveLog.pop()
+        self.castlingRights.undoCastleMove()
         
-        self.updateBoardWithMove(move(undoneMove.endSquare, undoneMove.startSquare, piece.none, None))
+        self.updateBoardWithMove(move(undoneMove.endSquare, undoneMove.startSquare, piece.none, None, undoneMove.isCastle), True)
         if undoneMove.capturedPiece:
             self.setPieceInformationAtIndex(undoneMove.capturedPiece, undoneMove.capturedPieceSquare)
+        self.getAllLegalMoves()     # update what the person who just moved can do
+        # get all squares that the current (almost previous) team can attack - used for castling rights & pins
+        self.squaresEnemyAttacks = [item.endSquare for sublist in self.legalMoves.values() for item in sublist] 
         self.whiteToMove = not self.whiteToMove
         self.getAllLegalMoves()
 
-    def updateBoardWithMove(self, chosenMove):
+    def updateBoardWithMove(self, chosenMove, undoing=False):
         if (chosenMove.capturedPiece != piece.none):
             self.setPieceInformationAtIndex(piece.none, chosenMove.capturedPieceSquare)
 
         currentPiece = self.board[chosenMove.startSquare]
+        currentPieceType = board.pieceToPieceType(currentPiece)
+        if currentPieceType == piece.pawn:  # pawn promotion (automatic queen)
+            file,rank = util.squareIndexToRelativeCoordinate(chosenMove.endSquare)
+            if rank == 0 or rank == 7:  # update the pieceLists 
+                chosenPiece = promotionScreen.choosePromotionForPawn()
+                if chosenPiece == 'queen': currentPiece = piece.queen
+                elif chosenPiece == 'rook': currentPiece = piece.rook
+                elif chosenPiece == 'bishop': currentPiece = piece.bishop
+                else: currentPiece = piece.knight
+                currentPiece = currentPiece | (piece.white if self.whiteToMove else piece.black) 
+        elif currentPieceType == piece.king and not undoing:    # moving king disables all castle rights
+            kingColor = 'white' if self.whiteToMove else 'black'
+            self.castlingRights.disableCastleMove([kingColor + 'QueenSide', kingColor + 'KingSide'])
+        elif currentPieceType == piece.rook and not undoing:    # moving rook disables one side castle rights
+            kingColor = 'white' if self.whiteToMove else 'black'
+            castleSide = 'QueenSide' if chosenMove.startSquare % 8 == 0 else 'KingSide'
+            self.castlingRights.disableCastleMove([kingColor + castleSide])
+
         self.setPieceInformationAtIndex(currentPiece, chosenMove.endSquare)
         self.setPieceInformationAtIndex(piece.none, chosenMove.startSquare)
+        if chosenMove.isCastle:
+            if not undoing:
+                rookSide = 1 if chosenMove.endSquare < chosenMove.startSquare else -1
+                rookSquare = chosenMove.endSquare + rookSide
+                noPieceSquare = chosenMove.endSquare-2 if rookSide == 1 else chosenMove.endSquare+1
+            else:
+                rookSide = 1 if chosenMove.startSquare < chosenMove.endSquare else -1
+                noPieceSquare = chosenMove.startSquare + rookSide 
+                rookSquare = round(noPieceSquare/8)*8
+                if rookSquare > noPieceSquare: rookSquare -= 1
+        
+            rookColor = piece.white if piece.isWhite(currentPiece) else piece.black
+            self.setPieceInformationAtIndex(piece.rook | rookColor, rookSquare)
+            self.setPieceInformationAtIndex(piece.none, noPieceSquare)
 
     def setPieceInformationAtIndex(self, currentPiece, squareIndex):
         pieceType = board.pieceToPieceType(currentPiece)
@@ -347,34 +369,45 @@ class board:
     
     def pieceToListIndex(currentPiece):
         pieceType = board.pieceToPieceType(currentPiece)
-        if (piece.isWhite(currentPiece)):
-            return pieceType-1
-        else:
-            return pieceType+5
+        offset = -1 if piece.isWhite(currentPiece) else 5
+        return pieceType + offset
         
-    def addMoveData(self, squareIndex, newSquareIndex, capturedPiece, capturedPieceSquare):
-        currentMove = move(squareIndex, newSquareIndex, capturedPiece, capturedPieceSquare)
-        self.piecesLegalMoves.append(currentMove)
+    def addMoveData(self, squareIndex, newSquareIndex, capturedPiece, capturedPieceSquare, isCastle=False):
+        if capturedPiece != piece.none and (piece.isWhite(capturedPiece) == self.whiteToMove): return   # can't attack self
+
+        self.piecesLegalMoves.append(move(squareIndex, newSquareIndex, capturedPiece, capturedPieceSquare, isCastle))
 
     def displayLegalMoves(self):
-        pieceMap = {
-            0: 'none',
-            1: 'king',
-            2: 'pawn',
-            3: 'knight',
-            4: 'bishop',
-            5: 'rook',
-            6: 'queen',  
-        }
         for pieceSquare, moves in self.legalMoves.items():
-            print('possible moves for : ' + self.pieceInformationString(pieceSquare, pieceMap))
+            print('possible moves for : ' + self.pieceInformationString(pieceSquare))
             for move in moves:
-                print('End Square: ' + self.pieceInformationString(move.endSquare, pieceMap))
-                if move.capturedPiece != 0: print('Captured piece square: ' + self.pieceInformationString(move.capturedPieceSquare, pieceMap))
+                print('End Square: ' + self.pieceInformationString(move.endSquare))
+                if move.capturedPiece != 0: print('Captured piece square: ' + self.pieceInformationString(move.capturedPieceSquare))
 
-    def pieceInformationString(self, pieceSquare, pieceMap):
+    def pieceInformationString(self, pieceSquare):
         currentPiece = self.board[pieceSquare]
         pieceType = board.pieceToPieceType(currentPiece)
         pieceColor = 'none ' if currentPiece == 0 else 'white ' if piece.isWhite(currentPiece) else 'black '
         file,rank = util.squareIndexToRelativeCoordinate(pieceSquare)
-        return pieceColor + pieceMap[pieceType] + ' at file ' + str(file) + ', rank ' + str(rank)
+        return pieceColor + piece.pieceMap[pieceType] + ' at file ' + str(file) + ', rank ' + str(rank)
+    
+class CastlingRights:
+    def __init__(self, whiteQueenSide=True, whiteKingSide=True, blackQueenSide=True, blackKingSide=True):
+        self.possibleCastles = {
+            'whiteQueenSide': whiteQueenSide,
+            'whiteKingSide': whiteKingSide,
+            'blackQueenSide': blackQueenSide,
+            'blackKingSide': blackKingSide
+        }
+        self.savedStates = []
+        
+    def saveCastleState(self):
+        self.savedStates.append(self.possibleCastles.copy())
+
+    def disableCastleMove(self, moveTypeList):
+        for moveType in moveTypeList:
+            self.possibleCastles[moveType] = False
+
+    def undoCastleMove(self):
+        if len(self.savedStates) == 0: return
+        self.possibleCastles = self.savedStates.pop()

@@ -14,7 +14,7 @@ class game:
         self.window = pygame.display.set_mode((width, height))
         pygame.display.set_caption('Chess')
 
-        titleScreen.waitGameStart(self.window) # Wait for user to start the game 
+        titleScreen.waitGameStart() # Wait for user to start the game 
 
         self.running = True
         self.board = gameBoard.board()
@@ -23,7 +23,7 @@ class game:
 
     def __del__(self):
         pygame.quit()
-    
+
     def playChess(self):
         self.handleInput()
         self.drawBoard()

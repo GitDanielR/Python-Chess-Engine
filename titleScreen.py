@@ -1,7 +1,10 @@
 import pygame
 from assets import color
+import button
 
-def waitGameStart(window):
+def waitGameStart():
+    window = pygame.display.get_surface()
+    
     displayInfo = pygame.display.Info()
     screenWidth = displayInfo.current_w
     screenHeight = displayInfo.current_h
@@ -11,6 +14,7 @@ def waitGameStart(window):
 
     title = titleFont.render("Chess", True, color['black'])
     titlePosition = title.get_rect(center=(screenWidth//2, screenHeight//2-tileSize//2))
+
     instructions = subheadingFont.render("Press enter to continue", True, color['black'])
     instructionsPosition = instructions.get_rect(center=(screenWidth//2, screenHeight//2+tileSize//3))
     hotkeys = subheadingFont.render("Z to undo & R to reset", True, color['black'])
