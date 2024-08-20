@@ -66,6 +66,8 @@ class game:
                 elif event.key == pygame.K_r:   # reset
                     self.board = gameBoard.board()
                     self.events = events.events()
+                elif event.key == pygame.K_e:
+                    self.board.printPositionAsFen()
 
     def updateMouseEvent(self):
         if (self.events.addClick(pygame.mouse.get_pos(), self.tileSize)):   # there was a click that wasn't deselecting (either first or second)
@@ -79,7 +81,6 @@ class game:
                     soundEffect.play()
                     self.board.makeMove(chosenMove)  # valid move chosen, make it
             elif (self.board.verifySelection(self.events.squareSelected)):  # first click, make sure can choose that square
-                print(self.board.piecePinDirections[self.board.whiteToMove][self.events.squareSelected])
                 return  # avoid clearing input if valid first click made
         
         self.events.resetMouseInput()   # clear user inputs (after move made or invalid piece chosen)

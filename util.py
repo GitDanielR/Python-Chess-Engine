@@ -31,3 +31,16 @@ def dFdRtoType(df, dr):
     elif horizontalSliding:
         return 'horizontal'
     return 'vertical'
+
+def getFenRepresentationOfPiece(pieceType, pieceColor):
+    if pieceType == 0: return ''
+
+    if pieceType == 1: p = 'k'
+    elif pieceType == 2: p = 'p'
+    elif pieceType == 3: p = 'n'
+    elif pieceType == 4: p = 'b'
+    elif pieceType == 5: p = 'r'
+    else: p = 'q'
+
+    if pieceColor: p = p.upper()
+    return p
