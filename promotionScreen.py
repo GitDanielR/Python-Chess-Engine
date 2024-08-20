@@ -1,6 +1,6 @@
 import pygame
 from assets import color
-import button
+from button import Button
 from piece import pieceMap
 
 # there are 4 choices for promotion
@@ -10,17 +10,17 @@ def choosePromotionForPawn():
     displayInfo = pygame.display.Info()
     screenWidth = displayInfo.current_w
     screenHeight = displayInfo.current_h
-    dx = screenWidth // 6   # 1/6 width
-    dy = screenHeight // 6  # height of button
-    xPadding = dx // 2
+    buttonWidth = buttonHeight = screenWidth // 6   # 1/6 width
+    buttonPadding = screenWidth // 16
     yPos = screenHeight // (6/2.5)
 
     buttons = []
     pieceMapIndex = 3
     # buttons for knight, bishop, rook, queen
-    for x in range(xPadding, xPadding*5, dx):
-        buttons.append(button.Button(color['darkTile'], x, yPos, dx, dy, pieceMap[pieceMapIndex]))
+    for x in range(4):
+        buttons.append(Button(color['darkTile'], (buttonPadding * (x+1)) + (x * buttonWidth), yPos, buttonWidth, buttonHeight, pieceMap[pieceMapIndex]))
         pieceMapIndex += 1
+    print(buttons)
 
     window.fill(color['white'])
     for button in buttons:

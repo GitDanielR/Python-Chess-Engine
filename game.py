@@ -8,7 +8,7 @@ import util
 class game:
     def __init__(self, width, height):
         boardSize = min(width,height)
-        self.tileSize = int(boardSize / 8)
+        self.tileSize = boardSize // 8
 
         pygame.init()
         self.window = pygame.display.set_mode((width, height))
@@ -16,15 +16,20 @@ class game:
 
         titleScreen.waitGameStart() # Wait for user to start the game 
 
-        self.running = True
         self.board = gameBoard.board()
         self.events = events.events()
         self.loadedAssets = loadedAssets(self.tileSize)
+        self.sounds = {'pieceMove': pygame.mixer.Sound("sounds/move.mp3"),
+                       'capture': pygame.mixer.Sound("sounds/capture.mp3")}
+        self.running = True
 
     def __del__(self):
         pygame.quit()
 
     def playChess(self):
+        # if self.board.whiteToMove: self.handleInput()
+        # else: self.board.makeAIMove()
+
         self.handleInput()
         self.drawBoard()
 
@@ -67,10 +72,15 @@ class game:
             if (len(self.events.mouseClicks) == 2): # trying to make move
                 startSquare = self.events.mouseClicks[0]
                 endSquare = self.events.mouseClicks[1]
+                
                 chosenMove = next((possibleMove for possibleMove in self.board.legalMoves[startSquare] if possibleMove.endSquare == endSquare), None)
-                if chosenMove is not None: self.board.makeMove(chosenMove)  # valid move chosen, make it
+                if chosenMove is not None: 
+                    soundEffect = self.sounds['capture'] if chosenMove.capturedPiece else self.sounds['pieceMove']
+                    soundEffect.play()
+                    self.board.makeMove(chosenMove)  # valid move chosen, make it
             elif (self.board.verifySelection(self.events.squareSelected)):  # first click, make sure can choose that square
-                return
+                print(self.board.piecePinDirections[self.board.whiteToMove][self.events.squareSelected])
+                return  # avoid clearing input if valid first click made
         
         self.events.resetMouseInput()   # clear user inputs (after move made or invalid piece chosen)
 

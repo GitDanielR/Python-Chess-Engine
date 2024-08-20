@@ -1,8 +1,9 @@
 from dataclasses import dataclass
 import numpy as np
 import piece
-import util
 import promotionScreen
+import random
+import util
 
 @dataclass
 class move:
@@ -28,6 +29,7 @@ class board:
         self.legalMoves = {}
         self.piecesLegalMoves = []
         self.squaresEnemyAttacks = []
+        self.piecePinDirections = [[0 for _ in range(64)],[0 for _ in range(64)]]   # idx 0 is black pins, 1 is white pins 
         self.initBoard()
 
     def initBoard(self):
@@ -116,6 +118,22 @@ class board:
         if pieceType == piece.queen or pieceType == piece.rook:
             self.addSliding(squareIndex)
 
+        self.filterPins(squareIndex)
+
+    def filterPins(self, squareIndex):
+        if len(self.piecesLegalMoves) == 0: return
+
+        pinType = self.piecePinDirections[self.whiteToMove][squareIndex]
+        if pinType == 0: return
+
+        startFile,startRank = util.squareIndexToRelativeCoordinate(squareIndex)
+        for possibleMove in self.piecesLegalMoves:
+            endFile,endRank = util.squareIndexToRelativeCoordinate(possibleMove.endSquare)
+            df = max(-1, min(endFile-startFile, 1))
+            dr = max(-1, min(endRank-startRank, 1))
+            if df != pinType[0] or dr != pinType[1]:
+                self.piecesLegalMoves.remove(possibleMove)
+
     def generatePawnMoves(self, squareIndex):
         movementDirection = -8 if piece.isWhite(self.board[squareIndex]) else 8
         file,rank = util.squareIndexToRelativeCoordinate(squareIndex)
@@ -164,8 +182,7 @@ class board:
         file,rank = util.squareIndexToRelativeCoordinate(squareIndex)
         for df in [-1,0,1]:
             for dr in [-1,0,1]:
-                if (df == 0 and dr == 0):
-                    continue
+                if (df == dr == 0): continue
                 
                 newFile = file+df
                 newRank = rank+dr
@@ -176,12 +193,17 @@ class board:
                 if not newSquareIndex in self.squaresEnemyAttacks: self.addMoveData(squareIndex, newSquareIndex, self.board[newSquareIndex], newSquareIndex)
 
         kingColor = 'white' if self.whiteToMove else 'black'
+        # have castling rights
         if self.castlingRights.possibleCastles[kingColor + 'QueenSide']: 
-            if ((squareIndex - 1) not in self.squaresEnemyAttacks) and ((squareIndex - 2) not in self.squaresEnemyAttacks):
-                self.addMoveData(squareIndex, squareIndex-2, piece.none, squareIndex-2, True)
+            # castling path not attacked by enemy pieces
+            if ((squareIndex - 1) not in self.squaresEnemyAttacks) and ((squareIndex - 2) not in self.squaresEnemyAttacks): 
+                # castling path doesn't have pieces in the way
+                if (self.board[squareIndex-1] == piece.none and self.board[squareIndex-2] == piece.none and self.board[squareIndex-3] == piece.none):
+                    self.addMoveData(squareIndex, squareIndex-2, piece.none, squareIndex-2, True)
         if self.castlingRights.possibleCastles[kingColor + 'KingSide']: 
             if ((squareIndex + 1) not in self.squaresEnemyAttacks) and ((squareIndex + 2) not in self.squaresEnemyAttacks):
-                self.addMoveData(squareIndex, squareIndex+2, piece.none, squareIndex+2, True)
+                if (self.board[squareIndex+1] == piece.none and self.board[squareIndex+2] == piece.none):
+                    self.addMoveData(squareIndex, squareIndex+2, piece.none, squareIndex+2, True)
     
     def addDiagonalSliding(self, squareIndex):
         file,rank = util.squareIndexToRelativeCoordinate(squareIndex)
@@ -227,6 +249,8 @@ class board:
         
     # pieceToMove/endPosition = (file,rank)
     def makeMove(self, chosenMove):
+        self.calculatePins()
+
         self.castlingRights.saveCastleState()
         self.moveLog.append(chosenMove)
 
@@ -260,10 +284,12 @@ class board:
 
         closestPiecesSquare = []
         attackType = []    
+        foundNearest = False
         # queen, rook, bishop
         for df in [-1,0,1]:
             for dr in [-1,0,1]:
-                if (df == 0 and dr == 0): continue
+                if (df == dr == 0): continue
+
                 currentFile, currentRank = file,rank
                 while True:
                     currentFile += df
@@ -273,7 +299,7 @@ class board:
                     currentSquare = util.relativeCoordinatesToSquareIndex((currentFile,currentRank))
                     pieceInPath = self.board[currentSquare]
                     if pieceInPath:
-                        closestPiecesSquare.append(currentSquare)
+                        if not foundNearest:closestPiecesSquare.append(currentSquare)
                         attackType.append(util.dFdRtoType(df, dr))
                         break
         
@@ -390,6 +416,79 @@ class board:
         pieceColor = 'none ' if currentPiece == 0 else 'white ' if piece.isWhite(currentPiece) else 'black '
         file,rank = util.squareIndexToRelativeCoordinate(pieceSquare)
         return pieceColor + piece.pieceMap[pieceType] + ' at file ' + str(file) + ', rank ' + str(rank)
+    
+    def calculatePins(self):
+        self.piecePinDirections = [[0 for _ in range(64)],[0 for _ in range(64)]]
+        whiteKing = np.where(self.board == (piece.king | piece.white))[0][0]
+        blackKing = np.where(self.board == (piece.king | piece.black))[0][0]
+
+        # only sliding pieces can pin -> do like sliding
+        whiteKingFile, whiteKingRank = util.squareIndexToRelativeCoordinate(whiteKing)
+        blackKingFile, blackKingRank = util.squareIndexToRelativeCoordinate(blackKing)
+        for df in [-1,0,1]:
+            for dr in [-1,0,1]:
+                if (df == dr == 0): continue
+
+                solvingForWhite = solvingForBlack = True
+                numWhiteEncountered = numBlackEncountered = 0
+                currentWhiteFile, currentWhiteRank = whiteKingFile, whiteKingRank
+                currentBlackFile, currentBlackRank = blackKingFile, blackKingRank
+                while solvingForWhite or solvingForBlack:
+                    if solvingForWhite:
+                        currentWhiteFile += df
+                        currentWhiteRank += dr
+                        if not util.fileRankInbounds(currentWhiteFile, currentWhiteRank): 
+                            solvingForWhite = False
+                            continue
+
+                        currentWhiteSquare = util.relativeCoordinatesToSquareIndex((currentWhiteFile, currentWhiteRank))
+                        pieceInWhitePath = self.board[currentWhiteSquare]
+
+                        if pieceInWhitePath and piece.isWhite(pieceInWhitePath): 
+                            numWhiteEncountered += 1
+                            if numWhiteEncountered == 2: solvingForWhite = False
+                        elif pieceInWhitePath and numWhiteEncountered == 1: 
+                            self.backtrackPin(currentWhiteSquare, df, dr, isWhite=True)
+                            solvingForWhite = False
+
+                    if solvingForBlack:
+                        currentBlackFile += df
+                        currentBlackRank += dr
+                        if not util.fileRankInbounds(currentBlackFile, currentBlackRank):
+                            solvingForBlack = False
+                            continue
+                        currentBlackSquare = util.relativeCoordinatesToSquareIndex((currentBlackFile,currentBlackRank))
+                        pieceInBlackPath = self.board[currentBlackSquare]
+
+                        if pieceInBlackPath and not piece.isWhite(pieceInBlackPath):
+                            numBlackEncountered += 1
+                            if numBlackEncountered == 2: solvingForBlack = False
+                        elif pieceInBlackPath and numBlackEncountered == 1:
+                            self.backtrackPin(currentBlackSquare, df, dr, isWhite=False)
+                            solvingForBlack = False
+    
+    def backtrackPin(self, currentSquare, df, dr, isWhite):
+        currentSquarePieceType = board.pieceToPieceType(currentSquare)
+        if currentSquarePieceType not in [piece.queen, piece.rook, piece.bishop]: return
+        file,rank = util.squareIndexToRelativeCoordinate(currentSquare)
+
+        kingToFind = (piece.king | (piece.white if isWhite else piece.black))
+        currentSquarePiece = piece.none
+        while currentSquarePiece != kingToFind:
+            file -= df
+            rank -= dr
+
+            currentSquare = util.relativeCoordinatesToSquareIndex((file,rank))
+            self.piecePinDirections[isWhite][currentSquare] = [df,dr]
+            currentSquarePiece = self.board[currentSquare]
+
+    def makeAIMove(self):
+        pieceMoves = []
+        while len(pieceMoves) == 0: 
+            chosenPiece = random.choice(list(self.legalMoves.keys()))
+            pieceMoves = self.legalMoves[chosenPiece]
+        self.makeMove(pieceMoves[0])
+
     
 class CastlingRights:
     def __init__(self, whiteQueenSide=True, whiteKingSide=True, blackQueenSide=True, blackKingSide=True):
