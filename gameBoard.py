@@ -17,7 +17,7 @@ class board:
     startingFen = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
     pawnPromotionFen = '8/P7/8/8/8/8/8/8 w - - 0 1'
     allCastlingPossibleFen = 'r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1'
-    piecePinnedFen = 'r3k2r/1pp2ppp/p1n1r3/3q2B1/3P4/2N5/PPP1QPPP/R3K2R b KQkq - 0 1'
+    piecePinnedFen = 'r3k2r/1pp2ppp/p1n1n3/3q2B1/3P4/2N5/PPP1QPPP/R3K2R b KQkq - 0 1'
     kingChecksHimselfWithPawnFen = 'r3k2r/1pp2ppp/p1n1b3/3P1q2/8/2N5/PPP1QPPP/R3K2R w KQkq - 0 1'
     
     def __init__(self, AIMode):
@@ -126,7 +126,7 @@ class board:
                         self.legalMoves[pieceSquare] = self.piecesLegalMoves
 
     def pieceIsPinned(self, squareIndex):
-        kingPosition = np.where(self.board == (not self.whiteToMove) * 8 + 9)[0][0]
+        kingPosition = np.argmax(self.board == (not self.whiteToMove) * 8 + 9)
         kingFile, kingRank = util.squareIndexToRelativeCoordinate(kingPosition)
         currentFile, currentRank = util.squareIndexToRelativeCoordinate(squareIndex)
 

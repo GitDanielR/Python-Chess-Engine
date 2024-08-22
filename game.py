@@ -61,12 +61,17 @@ class game:
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_z:
                     self.board.unmakeMove()
-                    if self.board.AIMode: self.board.unmakeMove()
+                    if self.board.AIMode: 
+                        self.board.unmakeMove()
                 elif event.key == pygame.K_r:   # reset to starting fen
                     self.board = gameBoard.board()
                     self.events = events.events()
                 elif event.key == pygame.K_e:
                     self.board.printPositionAsFen()
+                elif event.key == pygame.K_t:
+                    self.board.AIMode = not self.board.AIMode
+                    if self.board.AIMode:
+                        self.board.makeAIMove()
 
     def updateMouseEvent(self):
         if (self.events.addClick(pygame.mouse.get_pos(), self.tileSize)):   # there was a click that wasn't deselecting (either first or second)
