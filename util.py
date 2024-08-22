@@ -1,5 +1,3 @@
-import piece
-
 def squareIndexToRelativeCoordinate(index):
     rank = int(index / 8)
     file = index % 8
@@ -44,3 +42,8 @@ def getFenRepresentationOfPiece(pieceType, pieceColor):
 
     if pieceColor: p = p.upper()
     return p
+
+def printSquareIndexAsFileRank(squareIndexList):
+    for s in squareIndexList:
+        file, rank = squareIndexToRelativeCoordinate(s)
+        print(f"File: {file}, Rank: {rank}")

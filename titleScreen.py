@@ -14,10 +14,14 @@ def waitGameStart():
     title = titleFont.render("Chess", True, color['black'])
     titlePosition = title.get_rect(center=(screenWidth//2, screenHeight//2-tileSize//2))
 
-    instructions = subheadingFont.render("Press enter to play", True, color['black'])
-    instructionsPosition = instructions.get_rect(center=(screenWidth//2, screenHeight//2+tileSize//3))
+    soloplayerInstruction = subheadingFont.render("Press enter to play solo", True, color['black'])
+    soloplayerInstructionPosition = soloplayerInstruction.get_rect(center=(screenWidth//2, screenHeight//2+tileSize//3))
+
+    botInstructions = subheadingFont.render("Press shift to play vs. AI", True, color['black'])
+    botInstructionsPosition = botInstructions.get_rect(center=(screenWidth//2, screenHeight//2+2*tileSize//3))
+
     hotkeys = subheadingFont.render("Z to undo & R to reset", True, color['black'])
-    hotkeysPosition = hotkeys.get_rect(center=(screenWidth//2, screenHeight//2+2*tileSize//3))
+    hotkeysPosition = hotkeys.get_rect(center=(screenWidth//2, screenHeight//2+3*tileSize//3))
 
     # Draw the title screen
     for file in range(8):
@@ -25,7 +29,8 @@ def waitGameStart():
             tileColor = color['lightTile'] if (file + rank) % 2 != 0 else color['darkTile']
             pygame.draw.rect(window, tileColor, (file * tileSize, rank * tileSize, tileSize, tileSize))
     window.blit(title, titlePosition)
-    window.blit(instructions, instructionsPosition)
+    window.blit(soloplayerInstruction, soloplayerInstructionPosition)
+    window.blit(botInstructions, botInstructionsPosition)
     window.blit(hotkeys, hotkeysPosition)
     pygame.display.flip()
     
@@ -37,4 +42,7 @@ def waitGameStart():
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_RETURN:
                     window.fill(color['black'])
-                    return
+                    return False
+                elif event.key == pygame.K_LSHIFT or event.key == pygame.K_RSHIFT:
+                    window.fill(color['black'])
+                    return True

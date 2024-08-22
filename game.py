@@ -14,9 +14,10 @@ class game:
         self.window = pygame.display.set_mode((width, height))
         pygame.display.set_caption('Chess')
 
-        titleScreen.waitGameStart() # Wait for user to start the game 
+        # Wait for game start, returns True if option to play vs AI selected, False otherwise
+        playingAgainstAI = titleScreen.waitGameStart()
 
-        self.board = gameBoard.board()
+        self.board = gameBoard.board(playingAgainstAI)
         self.events = events.events()
         self.loadedAssets = loadedAssets(self.tileSize)
         self.sounds = {'pieceMove': pygame.mixer.Sound("sounds/move.mp3"),
@@ -27,11 +28,8 @@ class game:
         pygame.quit()
 
     def playChess(self):
-        # if self.board.whiteToMove: self.handleInput()
-        # else: self.board.makeAIMove()
-
-        self.handleInput()
         self.drawBoard()
+        self.handleInput()
 
     def drawBoard(self):
         for file in range(8):
@@ -63,7 +61,8 @@ class game:
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_z:
                     self.board.unmakeMove()
-                elif event.key == pygame.K_r:   # reset
+                    if self.board.AIMode: self.board.unmakeMove()
+                elif event.key == pygame.K_r:   # reset to starting fen
                     self.board = gameBoard.board()
                     self.events = events.events()
                 elif event.key == pygame.K_e:
@@ -80,6 +79,8 @@ class game:
                     soundEffect = self.sounds['capture'] if chosenMove.capturedPiece else self.sounds['pieceMove']
                     soundEffect.play()
                     self.board.makeMove(chosenMove)  # valid move chosen, make it
+                    if self.board.AIMode: self.board.makeAIMove()
+
             elif (self.board.verifySelection(self.events.squareSelected)):  # first click, make sure can choose that square
                 return  # avoid clearing input if valid first click made
         

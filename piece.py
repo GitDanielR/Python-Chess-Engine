@@ -23,3 +23,6 @@ pieceMap = {
 
 def isWhite(piece):
     return piece >> 3 == 1
+
+def pieceToPieceType(piece):
+        return piece & 0b00111

@@ -17,9 +17,11 @@ class board:
     startingFen = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
     pawnPromotionFen = '8/P7/8/8/8/8/8/8 w - - 0 1'
     allCastlingPossibleFen = 'r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1'
-    piecePinnedFen = 'r3k2r/1pp2ppp/p1n1b3/3q2B1/3P4/2N5/PPP1QPPP/R3K2R b KQkq - 0 1'
+    piecePinnedFen = 'r3k2r/1pp2ppp/p1n1r3/3q2B1/3P4/2N5/PPP1QPPP/R3K2R b KQkq - 0 1'
+    kingChecksHimselfWithPawnFen = 'r3k2r/1pp2ppp/p1n1b3/3P1q2/8/2N5/PPP1QPPP/R3K2R w KQkq - 0 1'
     
-    def __init__(self):
+    def __init__(self, AIMode):
+        self.AIMode = AIMode
         self.board = np.zeros(64, dtype=np.uint8)
         self.bitboards = np.zeros(6, dtype=np.uint64)
         self.pieceLists = [list() for _ in range(12)]
@@ -33,16 +35,17 @@ class board:
         self.initBoard()
 
     def initBoard(self):
-        self.positionFromFen(self.piecePinnedFen)
+        self.positionFromFen(self.startingFen)
         self.setupPieceInformation()
         self.getAllLegalMoves()
+        self.updateAttackedSquares()
     
     def setupPieceInformation(self):
         for squareIndex in range(64): 
             currentPiece = self.board[squareIndex]
 
             if (currentPiece != piece.none):
-                pieceType = board.pieceToPieceType(currentPiece)
+                pieceType = piece.pieceToPieceType(currentPiece)
                 pieceListIndex = board.pieceToListIndex(currentPiece)
                 mask = 1 << squareIndex
                 self.bitboards[pieceType-1] |= np.uint64(mask)
@@ -54,7 +57,7 @@ class board:
         for file in range(8):
             for rank in range(8):
                 currentPiece = self.board[file*8 + rank]
-                symbol = util.getFenRepresentationOfPiece(board.pieceToPieceType(currentPiece), piece.isWhite(currentPiece))
+                symbol = util.getFenRepresentationOfPiece(piece.pieceToPieceType(currentPiece), piece.isWhite(currentPiece))
                 if symbol == '': nBlanks += 1
                 else:
                     fenString += (str(nBlanks) if nBlanks > 0 else '') + symbol
@@ -63,7 +66,6 @@ class board:
             nBlanks = 0
         fenString += ' w' if self.whiteToMove else ' b'
 
-        idx = 0
         fenString += ' KQkq'
         fenString += ' - 0 1'
         print(fenString)  
@@ -76,7 +78,7 @@ class board:
     def isPawnCapture(self, squareIndex, squareSelected):
         squareFile,squareRank = util.squareIndexToRelativeCoordinate(squareIndex)
         selectedFile,selectedRank = util.squareIndexToRelativeCoordinate(squareSelected)
-        return (board.pieceToPieceType(self.board[squareIndex]) == piece.pawn and squareFile != selectedFile)
+        return (piece.pieceToPieceType(self.board[squareIndex]) == piece.pawn and squareFile != selectedFile)
 
     def positionFromFen(self, position):
         pieceTypeFromSymbol = {
@@ -127,13 +129,8 @@ class board:
         kingPosition = np.where(self.board == (not self.whiteToMove) * 8 + 9)[0][0]
         kingFile, kingRank = util.squareIndexToRelativeCoordinate(kingPosition)
         currentFile, currentRank = util.squareIndexToRelativeCoordinate(squareIndex)
-        print((kingFile, kingRank))
-        print((currentFile, currentRank))
 
         df, dr = kingFile-currentFile, kingRank-currentRank
-        if currentFile == 4 and currentRank == 2: 
-            print(df)
-            print(dr)
         if (df == 0 and dr == 0) or (abs(df) != abs(dr) and not (df == 0 or dr == 0)): return False
 
         def clampValue(val):
@@ -148,8 +145,10 @@ class board:
             currentFile += df
             currentRank += dr
 
-            if currentFile == kingFile and currentRank == kingRank: break
-            if self.board[util.relativeCoordinatesToSquareIndex((currentFile, currentRank))] != piece.none: return False
+            if currentFile == kingFile and currentRank == kingRank: 
+                break
+            if self.board[util.relativeCoordinatesToSquareIndex((currentFile, currentRank))] != piece.none: 
+                return False
         
         currentFile, currentRank = util.squareIndexToRelativeCoordinate(squareIndex)
         df, dr = -df, -dr
@@ -159,7 +158,7 @@ class board:
         while util.fileRankInbounds(currentFile, currentRank):
             pieceInPath = self.board[util.relativeCoordinatesToSquareIndex((currentFile, currentRank))]
             if pieceInPath:
-                return self.checkIfPieceCanPin(pieceInPath, -df, -dr)
+                return (-df, -dr) if self.checkIfPieceCanPin(pieceInPath, -df, -dr) else False
             
             currentFile += df
             currentRank += dr
@@ -167,10 +166,9 @@ class board:
         return False
     
     def checkIfPieceCanPin(self, pieceInPath, df, dr):
-        print('Piece found: ' + str(pieceInPath))
         if piece.isWhite(pieceInPath) == self.whiteToMove: return False     # can't pin yourself
         
-        pieceInPathType = board.pieceToPieceType(pieceInPath)
+        pieceInPathType = piece.pieceToPieceType(pieceInPath)
         if pieceInPathType == piece.queen: return True
         if pieceInPathType in [piece.pawn, piece.king]: return False  # these pieces can't pin, note knight's have already been returned false
 
@@ -179,15 +177,12 @@ class board:
 
     def populatelegalMoves(self, squareIndex):
         self.piecesLegalMoves = []
-        if self.pieceIsPinned(squareIndex): 
-            return
 
         currentPiece = self.board[squareIndex]
-        pieceType = board.pieceToPieceType(currentPiece)
+        pieceType = piece.pieceToPieceType(currentPiece)
 
         if pieceType == piece.pawn:
             self.generatePawnMoves(squareIndex)
-            return
         elif pieceType == piece.knight:
             self.generateKnightMoves(squareIndex)
         elif pieceType == piece.king:
@@ -198,13 +193,37 @@ class board:
         if pieceType == piece.queen or pieceType == piece.rook:
             self.addSliding(squareIndex)
 
+        if pinInformation := self.pieceIsPinned(squareIndex):
+            self.filterPins(pinInformation)
+
+    # pinInformation = (df, dr) for line from pinnedPiece to pinningPiece where -1 <= df,dr <= 1 and df,dr are integers
+    def filterPins(self, pinInformation):
+        def inlineMove(moveData):
+            startFile, startRank = util.squareIndexToRelativeCoordinate(moveData.startSquare)
+            endFile, endRank = util.squareIndexToRelativeCoordinate(moveData.endSquare)
+            df = endFile - startFile
+            dr = endRank - startRank
+            df = cap(df)
+            dr = cap(dr)
+
+            return abs(df) == abs(pinInformation[0]) and abs(dr) == abs(pinInformation[1])
+        
+        def cap(x):
+            if x == 0:
+                return 0
+            elif x < 0:
+                return -1
+            return 1
+        
+        self.piecesLegalMoves = [m for m in self.piecesLegalMoves if inlineMove(m)]
+
     def generatePawnMoves(self, squareIndex):
         movementDirection = -8 if piece.isWhite(self.board[squareIndex]) else 8
         file,rank = util.squareIndexToRelativeCoordinate(squareIndex)
         
         if (self.board[squareIndex+movementDirection] == piece.none):
             self.addMoveData(squareIndex, squareIndex+movementDirection, piece.none, None)
-            
+
             if ((rank == 1 and movementDirection == 8) or (rank == 6 and movementDirection == -8)):
                 newSquareIndex = squareIndex+(2*movementDirection)
                 if (self.board[newSquareIndex] == piece.none):
@@ -254,7 +273,8 @@ class board:
                     continue
                 newSquareIndex = util.relativeCoordinatesToSquareIndex((newFile, newRank))
                 # can't put yourself in check
-                if not newSquareIndex in self.squaresEnemyAttacks: self.addMoveData(squareIndex, newSquareIndex, self.board[newSquareIndex], newSquareIndex)
+                if not newSquareIndex in self.squaresEnemyAttacks: 
+                    self.addMoveData(squareIndex, newSquareIndex, self.board[newSquareIndex], newSquareIndex)
 
         kingColor = 'white' if self.whiteToMove else 'black'
         # have castling rights
@@ -321,10 +341,38 @@ class board:
 
         if self.check: print('In check')
         self.getAllLegalMoves()     # update what the person who just moved can do
-        # get all squares that the current (almost previous) team can attack - used for castling rights & pins
-        self.squaresEnemyAttacks = [item.endSquare for sublist in self.legalMoves.values() for item in sublist] 
+        self.updateAttackedSquares()
         self.whiteToMove = not self.whiteToMove
         self.getAllLegalMoves()
+
+    def updateAttackedSquares(self):
+        def addPawnMoveToList(p):
+            movementDirection = -8 if self.whiteToMove else 8
+            rankDir = -1 if self.whiteToMove else 1
+            for dir in [-1,1]:
+                file,rank = util.squareIndexToRelativeCoordinate(p)
+                if not util.fileRankInbounds(file + dir, rank + rankDir):
+                    continue
+                
+                pieceInPath = self.board[p + movementDirection + dir]
+                if pieceInPath == piece.none or piece.isWhite(pieceInPath) != self.whiteToMove:
+                    self.squaresEnemyAttacks.append(p + movementDirection + dir)
+
+        self.squaresEnemyAttacks = [
+            item.endSquare
+            for sublist in self.legalMoves.values() 
+            for item in sublist
+            if piece.pieceToPieceType(self.board[item.startSquare]) != piece.pawn
+        ]
+
+        # check the current team's pawns moves to see what they could attack but aren't
+        pieceListIndex = board.pieceToListIndex((piece.white if self.whiteToMove else piece.black) | piece.pawn)
+        pieceList = self.pieceLists[pieceListIndex]
+        if isinstance(pieceList, int):
+            addPawnMoveToList(pieceList)
+        else:
+            for p in pieceList:
+                addPawnMoveToList(p)
 
     def checkForCheck(self):
         kingSquare = self.findCurrentPlayersKingSquareIndex()
@@ -369,7 +417,7 @@ class board:
             blockingPiece = self.board[blockingPieceSquare]
             if blockingPiece not in possiblePieceMatches: continue
 
-            blockingPieceType = board.pieceToPieceType(blockingPiece)
+            blockingPieceType = piece.pieceToPieceType(blockingPiece)
             attackDirection = attackType[index]
             if blockingPieceType == piece.rook and (attackDirection == 'horizontal' or attackDirection == 'vertical'): return True
             elif blockingPieceType == piece.bishop and attackDirection == 'diagonal': return True
@@ -396,7 +444,7 @@ class board:
             self.setPieceInformationAtIndex(piece.none, chosenMove.capturedPieceSquare)
 
         currentPiece = self.board[chosenMove.startSquare]
-        currentPieceType = board.pieceToPieceType(currentPiece)
+        currentPieceType = piece.pieceToPieceType(currentPiece)
         if currentPieceType == piece.pawn:  # pawn promotion
             file,rank = util.squareIndexToRelativeCoordinate(chosenMove.endSquare)
             if rank == 0 or rank == 7:  # update the pieceLists 
@@ -432,7 +480,7 @@ class board:
             self.setPieceInformationAtIndex(piece.none, noPieceSquare)
 
     def setPieceInformationAtIndex(self, currentPiece, squareIndex):
-        pieceType = board.pieceToPieceType(currentPiece)
+        pieceType = piece.pieceToPieceType(currentPiece)
         pieceListIndex = board.pieceToListIndex(currentPiece)
         self.bitboards[pieceType-1] ^= np.uint64(squareIndex)
         self.board[squareIndex] = currentPiece
@@ -451,11 +499,8 @@ class board:
             return False
         return (piece.isWhite(chosenPiece) == self.whiteToMove)
     
-    def pieceToPieceType(piece):
-        return piece & 0b00111
-    
     def pieceToListIndex(currentPiece):
-        pieceType = board.pieceToPieceType(currentPiece)
+        pieceType = piece.pieceToPieceType(currentPiece)
         offset = -1 if piece.isWhite(currentPiece) else 5
         return pieceType + offset
         
@@ -473,7 +518,7 @@ class board:
 
     def pieceInformationString(self, pieceSquare):
         currentPiece = self.board[pieceSquare]
-        pieceType = board.pieceToPieceType(currentPiece)
+        pieceType = piece.pieceToPieceType(currentPiece)
         pieceColor = 'none ' if currentPiece == 0 else 'white ' if piece.isWhite(currentPiece) else 'black '
         file,rank = util.squareIndexToRelativeCoordinate(pieceSquare)
         return pieceColor + piece.pieceMap[pieceType] + ' at file ' + str(file) + ', rank ' + str(rank)
@@ -483,11 +528,10 @@ class board:
         while len(pieceMoves) == 0: 
             chosenPiece = random.choice(list(self.legalMoves.keys()))
             pieceMoves = self.legalMoves[chosenPiece]
-        self.makeMove(pieceMoves[0])
+        self.makeMove(random.choice(pieceMoves))
 
     def findCurrentPlayersKingSquareIndex(self):
-        return np.where(self.board == (self.whiteToMove * 8) + 9)[0][0]
-
+        return np.argmax(self.board == (self.whiteToMove * 8) + 9)
     
 class CastlingRights:
     def __init__(self, whiteQueenSide=True, whiteKingSide=True, blackQueenSide=True, blackKingSide=True):
