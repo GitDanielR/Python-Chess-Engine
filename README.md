@@ -8,3 +8,6 @@ Shortcuts:
 * z -> undo
 * t -> toggle between AI & solo play
 * r -> reset board to starting position
+
+<img src="./images/chessTitleScreen.png" alt="Chess title screen" width="800" height="800" border="10" />
+<img src="./images/chessGameState.png" alt="Chess game" width="800" height="800" border="10" />
