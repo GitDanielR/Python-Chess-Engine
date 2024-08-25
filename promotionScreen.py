@@ -2,6 +2,7 @@ import pygame
 from assets import color
 from button import Button
 from piece import pieceMap
+from sys import exit
 
 # there are 4 choices for promotion
 def choosePromotionForPawn():
@@ -30,7 +31,7 @@ def choosePromotionForPawn():
     while True:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
-                pygame.quit()
+                exit()
             if event.type == pygame.MOUSEBUTTONDOWN:
                 pos = pygame.mouse.get_pos()
                 for button in buttons:

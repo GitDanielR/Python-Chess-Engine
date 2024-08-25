@@ -1,1 +1,3 @@
 undoing pawn promotion keeps piece as queen
+
+queen doesn't pin properly on diagonals (works fine for pawns)

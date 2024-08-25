@@ -11,15 +11,16 @@ class game:
         self.tileSize = boardSize // 8
 
         pygame.init()
-        self.window = pygame.display.set_mode((width, height))
+        self.window = pygame.display.set_mode((width, height), pygame.RESIZABLE)
         pygame.display.set_caption('Chess')
+        pygame.event.set_allowed([pygame.QUIT, pygame.MOUSEBUTTONDOWN, pygame.KEYDOWN, pygame.VIDEORESIZE])
 
         # Wait for game start, returns True if option to play vs AI selected, False otherwise
-        playingAgainstAI = titleScreen.waitGameStart()
+        playingAgainstAI = titleScreen.waitGameStart("Chess")
 
         self.board = gameBoard.board(playingAgainstAI)
         self.events = events.events()
-        self.loadedAssets = loadedAssets(self.tileSize)
+        self.loadedAssets = self.loadAssets()
         self.sounds = {'pieceMove': pygame.mixer.Sound("sounds/move.mp3"),
                        'capture': pygame.mixer.Sound("sounds/capture.mp3")}
         self.running = True
@@ -48,30 +49,32 @@ class game:
             
         for index, pieceType in enumerate(self.board.pieceLists):
             for activePiecePosition in pieceType:
-                self.window.blit(self.loadedAssets.images[index], tuple(x * self.tileSize for x in util.squareIndexToRelativeCoordinate(activePiecePosition)))
+                self.window.blit(self.loadedAssets[index], tuple(x * self.tileSize for x in util.squareIndexToRelativeCoordinate(activePiecePosition)))
 
         pygame.display.flip()
 
     def handleInput(self):
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                self.running = False
-            elif event.type == pygame.MOUSEBUTTONDOWN:  # any mouse buttons lol
-                self.updateMouseEvent()
-            elif event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_z:
+        event = pygame.event.wait()
+
+        if event.type == pygame.QUIT:
+            self.running = False
+        elif event.type == pygame.MOUSEBUTTONDOWN:  # any mouse buttons lol
+            self.updateMouseEvent()
+        elif event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_z:
+                self.board.unmakeMove()
+                if self.board.AIMode: 
                     self.board.unmakeMove()
-                    if self.board.AIMode: 
-                        self.board.unmakeMove()
-                elif event.key == pygame.K_r:   # reset to starting fen
-                    self.board = gameBoard.board()
-                    self.events = events.events()
-                elif event.key == pygame.K_e:
-                    self.board.printPositionAsFen()
-                elif event.key == pygame.K_t:
-                    self.board.AIMode = not self.board.AIMode
-                    if self.board.AIMode:
-                        self.board.makeAIMove()
+            elif event.key == pygame.K_r:   # reset to starting fen
+                self.resetBoard()
+            elif event.key == pygame.K_e:
+                self.board.printPositionAsFen()
+            elif event.key == pygame.K_t:
+                self.board.AIMode = not self.board.AIMode
+                if self.board.AIMode:
+                    self.board.makeAIMove()
+        elif event.type == pygame.VIDEORESIZE:
+            self.resizeWindow(event.size, event.w, event.h)
 
     def updateMouseEvent(self):
         if (self.events.addClick(pygame.mouse.get_pos(), self.tileSize)):   # there was a click that wasn't deselecting (either first or second)
@@ -83,16 +86,32 @@ class game:
                 if chosenMove is not None: 
                     soundEffect = self.sounds['capture'] if chosenMove.capturedPiece else self.sounds['pieceMove']
                     soundEffect.play()
-                    self.board.makeMove(chosenMove)  # valid move chosen, make it
-                    if self.board.AIMode: self.board.makeAIMove()
+
+                    self.processCheckmate(self.board.makeMove(chosenMove))  # valid move chosen, make it
+                    if self.board.AIMode: 
+                        self.processCheckmate(self.board.makeAIMove())
 
             elif (self.board.verifySelection(self.events.squareSelected)):  # first click, make sure can choose that square
                 return  # avoid clearing input if valid first click made
         
         self.events.resetMouseInput()   # clear user inputs (after move made or invalid piece chosen)
+    
+    def resizeWindow(self, size, width, height):
+        self.window.fill(assets.color['black'])
+        self.tileSize = min(width, height) // 8
+        self.loadedAssets = self.loadAssets()
 
-class loadedAssets:
-    def __init__(self, tileSize):
-        self.images = []
+    def loadAssets(self):
+        images = []
         for i in range(12):
-            self.images.append(pygame.transform.scale(assets.pieceNumberToImage[i], (tileSize, tileSize)))
+            images.append(pygame.transform.scale(assets.pieceNumberToImage[i], (self.tileSize, self.tileSize)))
+        return images
+    
+    def processCheckmate(self, checkmate):
+        if checkmate:
+            self.board.AIMode = titleScreen.waitGameStart(f"{"You" if not self.board.whiteToMove else "AI"} win{"" if not self.board.whiteToMove else "s"}!")
+            self.resetBoard()
+    
+    def resetBoard(self):
+        self.board = gameBoard.board(self.board.AIMode)
+        self.events = events.events()

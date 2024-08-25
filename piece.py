@@ -21,6 +21,16 @@ pieceMap = {
     6: 'queen',  
 }
 
+values = {
+    0: 0,
+    1: 0,
+    2: 1,
+    3: 3,
+    4: 3,
+    5: 5,
+    6: 9
+}
+
 def isWhite(piece):
     return piece >> 3 == 1
 
