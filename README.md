@@ -2,7 +2,7 @@
 
 ## Chess engine developed using python, pygame, and numpy
 
-Python chess engine minus the smart engine part. Have move generation most of the way there with support for things like castling, pinned pieces, check, random AI moves, and basic move generation. Still need to make checks have an impact on pieces besides the king. Also includes some quality of life features like undoing, resetting the board, partial FEN string support (pieces, side to move) loading and retrieving from a game state, and different title and pawn promotion screens.
+Python chess engine minus the smart engine part (currently just greedy). Have move generation most of the way there with support, with a small known bug where some pins work and others don't. Also includes some quality of life features like undoing, resetting the board, FEN string support, and different title and pawn promotion screens.
 
 Shortcuts:
 * z -> undo
@@ -11,3 +11,4 @@ Shortcuts:
 
 <img src="./images/chessTitleScreen.png" alt="Chess title screen" width="800" height="800" border="10" />
 <img src="./images/chessGameState.png" alt="Chess game" width="800" height="800" border="10" />
+<img src="./images/chessCheckState.png" alt="Knight moves in checked position" width="800" height="800" border="10" />
