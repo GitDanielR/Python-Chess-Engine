@@ -15,12 +15,15 @@ class move:
     isCastle: bool
 
 class board:
+    # useful FENs
     startingFen = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
     pawnPromotionFen = '8/P7/8/8/8/8/8/8 w - - 0 1'
     allCastlingPossibleFen = 'r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1'
     piecePinnedFen = 'r3k2r/1pp2ppp/p1n1n3/3q2B1/3P4/2N5/PPP1QPPP/R3K2R w KQkq - 0 1'
-    kingChecksHimselfWithPawnFen = 'r3k2r/1pp2ppp/p1n1b3/3P1q2/8/2N5/PPP1QPPP/R3K2R w KQkq - 0 1'
     checkmateFen = '6k1/5ppp/8/8/8/5Q2/5PPP/6K1 w - - 0 1'
+
+    # FENs with known bugs
+    bugInKingMoves = 'rnb2b1r/pp2kpp1/2p1p2p/5n2/4N3/P7/1PP2PPP/R4KNR b KQkq - 0 1' # check king with knight to his right
     
     def __init__(self, AIMode):
         self.AIMode = AIMode
@@ -584,6 +587,8 @@ class board:
                     bestPieceCapture = capturedPieceValue
         
         self.iteratePieces(searchForBestMove)
+        if bestMove.capturedPiece == piece.none:
+            return self.getRandomMove()
         return bestMove
     
 class CastlingRights:
