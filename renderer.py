@@ -56,7 +56,11 @@ def draw_circle_on_tile(pygame, color, tile, window):
     pygame.draw.circle(window, color, screen_position, constants.TILE_SIZE // 8)
 
 def show_end_screen(pygame, white_won, window):
-    lines = ["White" if white_won else "Black" + " wins", "Press R to reset", "Press Z to undo"]
+    end_game_text = ("White" if white_won else "Black") + " wins\nPress R to reset\nPress Z to undo" 
+    show_screen(pygame, end_game_text, window)
+
+def show_screen(pygame, text, window):
+    lines = text.split("\n")
 
     font_size = 36
     font = pygame.font.Font(None, font_size)
@@ -64,4 +68,3 @@ def show_end_screen(pygame, white_won, window):
         text = font.render(line, True, colors["WHITE"])
         text_rect = text.get_rect(center=(constants.WIDTH // 2, constants.HEIGHT // 2 + index * font_size))
         window.blit(text, text_rect)
-    

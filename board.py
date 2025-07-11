@@ -2,7 +2,6 @@ import castle_rights
 import constants
 import move
 import piece
-import random
 
 board = []
 tiles_enemy_attacks = list()
@@ -82,7 +81,7 @@ def get_position_as_fen():
 def get_piece_list_offset(piece_color):
     return (constants.NUM_PIECES // 2) * (piece_color == piece.BLACK)
 
-def piece_to_list_index(chess_piece):
+def get_piece_list_index_from_piece(chess_piece):
     piece_color = piece.get_piece_color(chess_piece)
     piece_type = piece.get_piece_type(chess_piece)
     return piece_type_color_to_list_index(piece_color, piece_type)
@@ -135,8 +134,8 @@ def get_current_player_best_move():
     return best_move
 
 def make_move(chosen_move):    
-    update_board_with_move(chosen_move)
     move_log.append(chosen_move)
+    update_board_with_move(chosen_move)
 
 def undo_last_move():
     if len(move_log) == 0:
@@ -155,45 +154,53 @@ def update_board_with_move(chosen_move, is_undoing = False):
     moving_piece = board[end_square] if is_undoing else board[start_square]
     moving_piece_type = piece.get_piece_type(moving_piece)
     moving_piece_color = piece.get_piece_color(moving_piece)
+    moving_piece_is_white = piece.is_white(moving_piece)
 
     if is_undoing:
         castle_rights.pop_and_restore_previous_rights()
-        set_piece_information_at_square(board[end_square], start_square)
-        set_piece_information_at_square(piece.NONE, end_square)
-        set_piece_information_at_square(chosen_move.captured_piece, captured_piece_square)
+
+        if chosen_move.is_promotion:
+            moving_piece_as_pawn = piece.convert_to_piece(piece.PAWN, is_white=moving_piece_is_white)
+            set_piece_information_at_square_index(moving_piece_as_pawn, start_square)
+        else:
+            set_piece_information_at_square_index(board[end_square], start_square)
+        set_piece_information_at_square_index(piece.NONE, end_square)
+        set_piece_information_at_square_index(chosen_move.captured_piece, captured_piece_square)
 
         if chosen_move.is_castle:
             rook_start_square, rook_end_square = castle_rights.get_castle_rook_squares(chosen_move.end_tile, moving_piece_color, file_rank_to_square_index)
-            set_piece_information_at_square(board[rook_end_square], rook_start_square)
-            set_piece_information_at_square(piece.NONE, rook_end_square)
+            set_piece_information_at_square_index(board[rook_end_square], rook_start_square)
+            set_piece_information_at_square_index(piece.NONE, rook_end_square)
     else:
         castle_rights.save_castle_state()
         if chosen_move.is_castle:
             rook_start_square, rook_end_square = castle_rights.get_castle_rook_squares(chosen_move.end_tile, moving_piece_color, file_rank_to_square_index)
-            set_piece_information_at_square(board[rook_start_square], rook_end_square)
-            set_piece_information_at_square(piece.NONE, rook_start_square)
+            set_piece_information_at_square_index(board[rook_start_square], rook_end_square)
+            set_piece_information_at_square_index(piece.NONE, rook_start_square)
         castle_rights.update_castle_rights(moving_piece_type, chosen_move.start_tile, moving_piece_color)
 
-        set_piece_information_at_square(piece.NONE, captured_piece_square)
-        set_piece_information_at_square(board[start_square], end_square)
-        set_piece_information_at_square(piece.NONE, start_square)
+        set_piece_information_at_square_index(piece.NONE, captured_piece_square)
+        if chosen_move.is_promotion:
+            moving_piece_as_queen = piece.convert_to_piece(piece.QUEEN, is_white=moving_piece_is_white)
+            set_piece_information_at_square_index(moving_piece_as_queen, end_square)
+        else:
+            set_piece_information_at_square_index(board[start_square], end_square)
+        set_piece_information_at_square_index(piece.NONE, start_square)
 
     white_to_move = not white_to_move
     update_legal_moves()
 
-def set_piece_information_at_square(chess_piece, square_index):
+def set_piece_information_at_square_index(chess_piece, square_index):
     global board, piece_lists
     
-    board[square_index] = chess_piece
-    
     if chess_piece != piece.NONE:
-        piece_list_index = piece_to_list_index(chess_piece)
+        piece_list_index = get_piece_list_index_from_piece(chess_piece)
         piece_lists[piece_list_index].append(square_index)
-    else:
-        for piece_list in piece_lists:
-            if square_index in piece_list:
-                piece_list.remove(square_index)
-                break
+    elif (piece_at_square := board[square_index]) != piece.NONE:
+        piece_list_index = get_piece_list_index_from_piece(piece_at_square)
+        piece_lists[piece_list_index].remove(square_index)
+    
+    board[square_index] = chess_piece
 
 def iterate_color_pieces(function, iterate_white):
     piece_list_offset = get_piece_list_offset(piece.WHITE if iterate_white else piece.BLACK)
@@ -222,14 +229,14 @@ def update_legal_moves():
         nonlocal num_legal_moves
 
         piece_moves = get_piece_legal_moves(square_index, piece_other_than_king_can_move=piece_other_than_king_can_move)
-        filtered_moves = filter_sudo_legal_moves(board[square_index], piece_moves, num_times_current_player_king_attacked)
+        filtered_moves = filter_sudo_legal_moves(board[square_index], piece_moves)
         num_legal_moves += len(filtered_moves)
         legal_moves[square_index] = filtered_moves
     iterate_color_pieces(get_piece_moves, iterate_white=white_to_move)
     is_checkmate = num_legal_moves == 0
 
-def filter_sudo_legal_moves(moving_piece, piece_moves, num_times_current_player_king_attacked):
-    if len(piece_moves) == 0 or len(checking_paths) == 0 or num_times_current_player_king_attacked == 0:
+def filter_sudo_legal_moves(moving_piece, piece_moves):
+    if len(piece_moves) == 0 or len(checking_paths) == 0:
         return piece_moves
     checking_path = checking_paths[0]
     if piece.get_piece_type(moving_piece) == piece.KING:
@@ -254,7 +261,7 @@ def get_piece_at_file_rank(tile):
     return board[square_index]
 
 def update_pinned_and_checking_pieces():
-    global pinned_pieces, checking_paths
+    global pinned_pieces, checking_paths, tiles_enemy_attacks
     pinned_pieces = []
     checking_paths = []
     
@@ -283,6 +290,9 @@ def update_pinned_and_checking_pieces():
                     if piece.can_pin_in_direction(current_piece, d_file, d_rank):
                         pinned_pieces.extend(pinned_square_path)
                         if number_friendly_pieces_in_direction == 0:
+                            # Stops king from moving opposite of rook/bishop/queen piece checking
+                            if is_file_rank_inbounds((king_file - d_file, king_rank - d_rank)):
+                                tiles_enemy_attacks.append((king_file - d_file, king_rank - d_rank))
                             checking_paths.append(checking_square_path)
                     break
                 
@@ -303,25 +313,30 @@ def get_king_tile(king_value):
 def get_piece_legal_moves(square_index, piece_other_than_king_can_move):
     current_piece = board[square_index]
     piece_type = piece.get_piece_type(current_piece)
-    piece_color = piece.get_piece_color(current_piece)
-    file, rank = square_index_to_file_rank(square_index)
+
+    if piece_type != piece.KING and not piece_other_than_king_can_move:
+        return []
     
     piece_legal_moves = []
-    if piece_type == piece.PAWN and piece_other_than_king_can_move:
+    piece_color = piece.get_piece_color(current_piece)
+    file, rank = square_index_to_file_rank(square_index)
+    if piece_type == piece.PAWN:
         piece_legal_moves.extend(get_pawn_moves(file, rank, piece_color))
-    elif piece_type == piece.KNIGHT and piece_other_than_king_can_move:
+    elif piece_type == piece.KNIGHT:
         piece_legal_moves.extend(get_knight_moves(file, rank))
     elif piece_type == piece.KING:
         piece_legal_moves.extend(get_king_moves(file, rank, piece_color))
         
-    if (piece_type == piece.BISHOP or piece_type == piece.QUEEN) and piece_other_than_king_can_move:
+    if piece_type == piece.BISHOP or piece_type == piece.QUEEN:
         piece_legal_moves.extend(get_diagonal_sliding_moves(file, rank))
-    if (piece_type == piece.ROOK or piece_type == piece.QUEEN) and piece_other_than_king_can_move:
+    if piece_type == piece.ROOK or piece_type == piece.QUEEN:
         piece_legal_moves.extend(get_vertical_sliding_moves(file, rank))
         
     return piece_legal_moves
 
-def add_move_data(move_list, start_tile, end_tile, captured_piece_tile = None, is_castle = False):
+def add_move_data(move_list, start_tile, end_tile, captured_piece_tile = None, is_castle = False, is_promotion = False, is_double_pawn_push = False):
+    global tiles_enemy_attacks
+
     if captured_piece_tile == None:
         captured_piece_tile = end_tile
     
@@ -330,12 +345,18 @@ def add_move_data(move_list, start_tile, end_tile, captured_piece_tile = None, i
         moving_piece = get_piece_at_file_rank(start_tile)
 
         if moving_piece == piece.KING or not piece_movement_violates_pin(start_tile, end_tile):
-            captured_piece_is_enemy = piece.is_white(captured_piece) != piece.is_white(moving_piece)
+            captured_piece_is_white = piece.is_white(captured_piece)
+            moving_piece_is_white = piece.is_white(moving_piece)
+
+            captured_piece_is_enemy = captured_piece != piece.NONE and captured_piece_is_white != moving_piece_is_white
+            captured_piece_is_friendly = captured_piece != piece.NONE and captured_piece_is_white == moving_piece_is_white
             if captured_piece == piece.NONE or captured_piece_is_enemy:
-                move_list.append(move.move(start_tile, end_tile, captured_piece, captured_piece_tile, is_castle))
-                if captured_piece != piece.NONE and captured_piece_is_enemy:
+                move_list.append(move.move(start_tile, end_tile, captured_piece, captured_piece_tile, is_castle, is_promotion, is_double_pawn_push))
+                if captured_piece_is_enemy:
                     return False
                 return True
+            elif captured_piece_is_friendly:
+                tiles_enemy_attacks.append(end_tile)
     return False
 
 def piece_movement_violates_pin(start_tile, end_tile):
@@ -360,7 +381,8 @@ def piece_movement_violates_pin(start_tile, end_tile):
     return False
 
 def is_tile_empty(tile_pos):
-    return get_piece_at_file_rank(tile_pos) == piece.NONE
+    piece_at_tile = get_piece_at_file_rank(tile_pos)
+    return piece_at_tile == piece.NONE
 
 def get_pawn_moves(file, rank, piece_color):
     direction = -1 if piece_color == piece.WHITE else 1
@@ -368,22 +390,23 @@ def get_pawn_moves(file, rank, piece_color):
     
     move_list = []
     if is_tile_empty((file, rank + direction)):
-        add_move_data(move_list, start_tile, (file, rank + direction))
-    if (rank == 1 and piece_color == piece.BLACK) or (rank == 6 and piece_color == piece.WHITE):
-        if is_tile_empty((file, rank + direction * 2)):
-            add_move_data(move_list, start_tile, (file, rank + direction * 2))
+        end_rank = rank + direction
+        add_move_data(move_list, start_tile, (file, rank + direction), is_promotion=(end_rank == 0 or end_rank == constants.NUM_TILES - 1))
+        if (rank == 1 and piece_color == piece.BLACK) or (rank == 6 and piece_color == piece.WHITE):
+            if is_tile_empty((file, rank + direction * 2)):
+                add_move_data(move_list, start_tile, (file, rank + direction * 2), is_double_pawn_push=True)
     if is_enemy_at_tile((file + 1, rank + direction)):
         add_move_data(move_list, start_tile, (file + 1, rank + direction))
     if is_enemy_at_tile((file - 1, rank + direction)):
         add_move_data(move_list, start_tile, (file - 1, rank + direction))
     
     # En Passant
-    if (rank == 3 and piece_color == piece.WHITE) or (rank == 4 and piece_color == piece.BLACK):
-        left_board_piece = get_piece_at_file_rank((file - 1, rank))
-        right_board_piece = get_piece_at_file_rank((file + 1, rank))
-        if is_piece_enemy(left_board_piece) and piece.get_piece_type(left_board_piece) == piece.PAWN:
+    if len(move_log) > 0 and (rank == 3 and piece_color == piece.WHITE) or (rank == 4 and piece_color == piece.BLACK):
+        previous_move = move_log[-1]
+        previous_move_file, _ = previous_move.end_tile
+        if previous_move.is_double_pawn_push and previous_move_file == file - 1:
             add_move_data(move_list, start_tile, (file - 1, rank + direction), captured_piece_tile=(file - 1, rank))
-        if is_piece_enemy(right_board_piece) and piece.get_piece_type(right_board_piece) == piece.PAWN:
+        elif previous_move.is_double_pawn_push and previous_move_file == file + 1:
             add_move_data(move_list, start_tile, (file + 1, rank + direction), captured_piece_tile=(file + 1, rank))
     return move_list
     
@@ -456,8 +479,8 @@ def file_rank_to_square_index(coord):
     return tens_place + coord[0]
     
 def square_index_to_file_rank(square_index):
-    file = square_index % 8
-    rank = square_index // 8
+    file = square_index % constants.NUM_TILES
+    rank = square_index // constants.NUM_TILES
     return (file, rank)
     
 def validate_start_tile(start_tile):
