@@ -20,7 +20,7 @@ PAWN_PROMOTION_SETUP_FEN_STRING = "rn3bnr/p2P1ppp/6k1/4p2q/Q7/P7/1PP1BBPP/RNB1KB
 PIECE_DEFENSE_FEN_STRING = "7r/7k/Q4Q1p/7B/8/b7/1PP2BPP/RNB1KBNR w KQ - 0 1"
 
 # FEN string chess board loads on game start/reset 
-CURRENT_BOARD_FEN_STRING = PIECE_DEFENSE_FEN_STRING
+CURRENT_BOARD_FEN_STRING = STARTING_POSITION_FEN_STRING
 
 #-------------------------------------- Constants & functions that aren't meant to be changed --------------------------------------#
 # Chess Constants
