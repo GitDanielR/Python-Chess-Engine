@@ -54,6 +54,12 @@ def position_from_fen(fen_string):
                 
     white_to_move = fen_sections[1] == "w"
     castle_rights.init(fen_sections[2])
+    if fen_sections[3] != "-":
+        en_passant_target_file, en_passant_target_rank  = algebraic_to_file_rank(fen_sections[3])
+        enemy_pawn_movement_direction = 1 if white_to_move else -1
+        start_tile = (en_passant_target_file, en_passant_target_rank - enemy_pawn_movement_direction)
+        end_tile = (en_passant_target_file, en_passant_target_rank + enemy_pawn_movement_direction)
+        move_log.append(move.move(start_tile, end_tile, piece.NONE, end_tile, False, False, True))
     update_legal_moves()
 
 def get_position_as_fen():
@@ -74,7 +80,11 @@ def get_position_as_fen():
     
     fen_string += " w" if white_to_move else " b"
     fen_string += " " + castle_rights.get_fen_representation()
-    fen_string += " - 0 1"
+    if len(move_log) > 0 and move_log[-1].is_double_pawn_push:
+        fen_string += " " + file_rank_to_algebraic(move_log[-1].start_tile)
+    else:
+        fen_string += " -"
+    fen_string += " 0 1"
     
     return fen_string
 
@@ -490,3 +500,17 @@ def validate_start_tile(start_tile):
 def is_file_rank_inbounds(tile):
     file, rank = tile
     return 0 <= file < constants.NUM_TILES and 0 <= rank < constants.NUM_TILES
+
+def algebraic_to_file_rank(algebraic_repr):
+    character_ascii_offset = 0x61
+    algebraic_file = algebraic_repr[0]
+    algebraic_rank = algebraic_repr[1]
+    return (ord(algebraic_file) - character_ascii_offset, constants.NUM_TILES - int(algebraic_rank))
+
+def file_rank_to_algebraic(start_tile):
+    character_ascii_offset = 0x61
+    file, rank = start_tile
+    enemy_movement_direction = -1 if white_to_move else 1
+    algebraic_file = chr(character_ascii_offset + file)
+    algebraic_rank = constants.NUM_TILES - rank + enemy_movement_direction
+    return algebraic_file + str(algebraic_rank)
