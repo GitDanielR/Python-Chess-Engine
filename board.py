@@ -575,5 +575,5 @@ def best_move():
                 best_eval = evaluation
 
         return alpha
-    search_board_for_move(2, float("-inf"), float("inf"))
+    search_board_for_move(constants.AI_SEARCH_DEPTH, float("-inf"), float("inf"))
     return best_move
