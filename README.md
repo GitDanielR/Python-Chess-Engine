@@ -71,3 +71,18 @@ rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1
 ```
 
 The current position FEN can be accessed through the engine interface.
+
+## Gameplay
+
+Pinned bishop:
+<img width="800" height="800" alt="Bishop Pinned Moves" src="https://github.com/user-attachments/assets/f7960d7a-52e9-4481-87d3-5c5d96446232" />
+
+Castling:
+<img width="800" height="800" alt="Castle Moves" src="https://github.com/user-attachments/assets/bd344ed6-8120-4a20-9035-125725930416" />
+
+En Passant:
+<img width="800" height="800" alt="En Passant Moves" src="https://github.com/user-attachments/assets/61687712-c86f-4eb1-82fd-6f61f620724a" />
+
+King Moves:
+<img width="800" height="800" alt="King Moves" src="https://github.com/user-attachments/assets/954bd039-440d-44e9-9f70-09ed7f3e400e" />
+
