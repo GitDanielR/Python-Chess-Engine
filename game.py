@@ -3,7 +3,7 @@ import board
 import constants
 import events
 import pygame
-from pyperclip import copy
+#from pyperclip import copy
 import renderer
 import sound
 
@@ -101,6 +101,6 @@ def undo_move():
     
 def print_board_fen():
     fen_string = board.get_position_as_fen()
-    copy(fen_string)
+    #copy(fen_string)
     print(fen_string)
     events.print_fen_pending = False

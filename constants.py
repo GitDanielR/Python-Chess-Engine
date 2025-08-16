@@ -4,7 +4,7 @@ WIDTH = 800
 HEIGHT = 800
 
 # Controls if black makes moves for itself
-IS_AI_MODE = False
+IS_AI_MODE = True
 
 # Board FEN strings
 STARTING_POSITION_FEN_STRING = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"

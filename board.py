@@ -122,7 +122,7 @@ def make_player_move(start_tile, end_tile):
         return False
 
 def make_ai_move():
-    chosen_move = get_current_player_best_move()
+    chosen_move = best_move()
     make_move(chosen_move)
     
 def get_current_player_best_move():
@@ -514,3 +514,66 @@ def file_rank_to_algebraic(start_tile):
     algebraic_file = chr(character_ascii_offset + file)
     algebraic_rank = constants.NUM_TILES - rank + enemy_movement_direction
     return algebraic_file + str(algebraic_rank)
+
+def evaluate_board():
+    white_eval = 0
+    black_eval = 0
+
+    for chess_piece in board:
+        chess_piece_type = piece.get_piece_type(chess_piece)
+        if chess_piece_type != piece.NONE and chess_piece_type != piece.KING:
+            piece_value = piece.get_piece_value(chess_piece)
+            if piece.is_white(chess_piece):
+                white_eval += piece_value
+            else:
+                black_eval += piece_value
+    
+    evaluation = white_eval - black_eval
+    perspective = 1 if white_to_move else -1
+
+    return evaluation * perspective
+
+def order_moves(moves):
+    def evaluate_move(possible_move):
+        move_score_guess = 0
+        moving_piece = get_piece_at_file_rank(possible_move.start_tile)
+        moving_piece_type = piece.get_piece_type(moving_piece)
+        captured_piece_type = piece.get_piece_type(possible_move.captured_piece)
+
+        if captured_piece_type != piece.NONE:
+            move_score_guess = 10 * piece.get_piece_value(captured_piece_type) - piece.get_piece_value(moving_piece_type)
+        if possible_move.is_promotion:
+            move_score_guess += piece.get_piece_value(piece.QUEEN)
+        if possible_move.end_tile in tiles_enemy_attacks:
+            move_score_guess -= piece.get_piece_value(moving_piece_type)
+        return move_score_guess
+    moves.sort(key=evaluate_move)
+
+def best_move():
+    best_move = None
+    best_eval = float("-inf")
+
+    def search_board_for_move(depth, alpha, beta):
+        nonlocal best_move, best_eval 
+
+        if depth == 0:
+            return evaluate_board()
+        if is_checkmate:
+            return float("-inf")
+
+        current_legal_moves = [move for move_list in legal_moves.values() for move in move_list] 
+        order_moves(current_legal_moves)
+        for legal_move in current_legal_moves:
+            make_move(legal_move)
+            evaluation = -search_board_for_move(depth - 1, -beta, -alpha)
+            undo_last_move()
+            if evaluation >= beta:
+                return beta
+            if evaluation > alpha:
+                alpha = evaluation
+                best_move = legal_move
+                best_eval = evaluation
+
+        return alpha
+    search_board_for_move(2, float("-inf"), float("inf"))
+    return best_move
