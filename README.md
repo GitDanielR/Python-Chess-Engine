@@ -61,7 +61,7 @@ python main.py
 - 'P' to print the current board state as a FEN string
 
 ### AI Options
-The AI strength can be adjusted by modifying the search depth in the engine parameters (default looks ahead 2 moves).
+The AI strength can be adjusted by modifying the search depth in the constants file.
 
 ## FEN Support
 
